@@ -1,0 +1,81 @@
+---
+title: "Practical Machine Learning - weight lifting exercise"
+author: "Zhenning Xu"
+date: "05.12.2019"
+output: html_document
+---
+
+### Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+## Loading data
+The training data for this project are available here: 
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: 
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+```{r cache=TRUE}
+library(RCurl)
+train_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+train <- read.csv(text=getURL(train_url), na.strings=c("", "NA"))
+test <- read.csv(text=getURL(test_url), na.strings=c("", "NA"))
+```
+
+Since the data set have a lot of missing data, we need to preprocess data.
+```{r preparing data}
+# remove columns with a lot of NA values
+goodVars <- which((colSums(!is.na(train)) >= 0.6*nrow(train)))
+train <- train[,goodVars]
+test <- test[,goodVars]
+# remove problem id
+test <- test[-ncol(test)]
+# fix factor levels
+test$new_window <- factor(test$new_window, levels=c("no","yes"))
+#Remove X and cvtd_timestamp colums from the dataset since they are not relevant
+train <- train[,-c(1,5)]
+test <- test[,-c(1,5)]
+```
+
+## Building the model.
+The goal of project is to predict the manner in which participants did the exercise. This is the *classe* variable in the training set (Factor variable with 5 levels A, B, C, D, E).
+
+### CART model
+The first model for prediction will be CART model or Classification and Regression Tree. Let's build the model and plot the tree, to see how classification is made.
+
+```{r results='hide', message=FALSE, warning=FALSE}
+library(rpart)
+library(rpart.plot)
+```
+```{r cart model}
+modelCART <- rpart(classe ~ ., data = train)
+# we can plot the tree to see how classification is working 
+prp(modelCART)
+```
+Now, let's make predictions for test set.
+```{r cart predictions}
+#predictions for the test set
+predictCART <- predict(modelCART, newdata = test)
+test$classe <- NULL
+for (i in 1:length(test[,1])) {
+        test$classe[i] <- names(which.max(predictCART[i,]))
+}
+as.factor(test$classe)
+```
+
+## Random Forest
+The second model is Random Forest.
+
+```{r results='hide', message=FALSE, warning=FALSE}
+library(randomForest)
+```
+```{r random forest}
+modelRF <- randomForest(classe ~ ., data=train)
+test$classe <- predict(modelRF, newdata = test)
+test$classe
+```
+
+### Results.
+One can see that there is a difference in resulsts for CART model and Random Forests. It has to do with the fact that CART model has larger prediction error. All results was submitted in different part of this course project.
